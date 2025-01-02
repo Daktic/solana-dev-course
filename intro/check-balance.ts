@@ -27,7 +27,7 @@ for (const domain of domains_to_check){
     // convert SNS to public key
     const { pubkey } = getDomainKeySync(domain);
 
-    const balanceInLamports = await connection.getBalance(pubkey);
+    const balanceInLamports = await mainConnection.getBalance(pubkey);
 
     const balanceInSol = balanceInLamports / LAMPORTS_PER_SOL;
 
