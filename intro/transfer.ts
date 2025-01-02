@@ -2,7 +2,6 @@ import {
     Connection,
     Transaction,
     SystemProgram,
-    sendAndConfirmRawTransaction,
     PublicKey, sendAndConfirmTransaction
 } from "@solana/web3.js";
 import "dotenv/config";
