@@ -1,13 +1,15 @@
 import {useEffect, useState} from "react";
 
 import {useConnection, useWallet} from "@solana/wallet-adapter-react";
-import {LAMPORTS_PER_SOL, Keypair, Transaction, SystemProgram} from "@solana/web3.js";
+import {LAMPORTS_PER_SOL, Keypair, Transaction, SystemProgram, PublicKey} from "@solana/web3.js";
 
 import {
     MINT_SIZE,
     TOKEN_PROGRAM_ID,
     getMinimumBalanceForRentExemptMint,
     createInitializeMintInstruction,
+    getAssociatedTokenAddress,
+    createAssociatedTokenAccountInstruction
 } from '@solana/spl-token';
 
 
@@ -17,10 +19,13 @@ const TokenApp = () => {
     const { connection } = useConnection();
     const { publicKey, sendTransaction } = useWallet();
 
+    const [txLogs, setTxLogs] = useState<string[]>([])
     const [solBalance, setSolBalance] = useState(0);
-    const [mintAddress, setMintAddress] = useState("");
-    const [tokenAccountAddress, setTokenAccountAddress] = useState("");
+    const [mintAddress, setMintAddress] = useState(PublicKey.default);
+    const [tokenAccountAddress, setTokenAccountAddress] = useState(PublicKey.default);
     const [tokenBalance, setTokenBalance] = useState(0);
+    const [recepientAddress, setRecepientAddress] = useState(PublicKey.default);
+    const [amount, setAmount] = useState(0);
 
     useEffect(() => {
         if (!publicKey) return;
@@ -34,7 +39,7 @@ const TokenApp = () => {
         fetchSolBalance();
     }, [publicKey]);
 
-    const mintToken = async (event: any) => {
+    const createMint = async (event: any) => {
         event.preventDefault();
         if (!connection || !publicKey) {
             return;
@@ -63,31 +68,91 @@ const TokenApp = () => {
             )
         );
 
-        sendTransaction(transaction, connection, {
-            signers: [mint],
-        }).then((sig) => {
-            console.log(sig);
-            setMintAddress(mint.publicKey.toString());
-        });
+        const sig = await sendTransaction(transaction, connection, {signers: [mint]});
+        setTxLogs(
+            txLogs.concat([
+                `Created Mint: ${mint.publicKey.toString()}`,
+                `Mint Signature: ${sig}`,
+            ]))
+        setMintAddress(mint.publicKey);
     };
+
+    const transaction = new Transaction();
+
+    const createTokenAccount = async (event: any) => {
+        event.preventDefault();
+        if (!connection || !publicKey) {
+            return;
+        }
+
+        const associatedTokenAddress = await getAssociatedTokenAddress(
+            mintAddress,
+            publicKey,
+            false,
+        );
+
+        // create token account pda
+        const createTokenAccount = createAssociatedTokenAccountInstruction(
+            publicKey,
+            associatedTokenAddress,
+            publicKey,
+            mintAddress,
+        );
+
+        transaction.add(createTokenAccount);
+
+        const sig = await sendTransaction(transaction, connection);
+        setTxLogs(
+            txLogs.concat([
+                `Created PDA: ${associatedTokenAddress}`,
+                `PDA Signature: ${sig}`,
+            ]))
+        setTokenAccountAddress(associatedTokenAddress);
+    }
+
+    const handleRecepientChange = (event: any) => {
+        setRecepientAddress(event.target.value);
+    }
+    const handleAmountChange = (event: any) => {
+        if (event.target.value === '') {
+            setAmount(0);
+        }
+        if (event.target.value < 0) {
+            setAmount(0);
+        }
+        setAmount(event.target.value);
+    }
+
+    const MintToken = async (event: any) => {
+        event.preventDefault();
+        if (!connection || !publicKey) {
+            return;
+        }
+
+
+    }
 
     return (
         <div>
+            <h3>Logs</h3>
+            <div
+                style={{overflowY: 'scroll', height: '100px', backgroundColor: 'black', color: 'green'}}>
+
+                {txLogs.map((log, index) => <p key={index}>{log}</p>)}
+            </div>
             <h2>SOL Balance <span>{solBalance}</span></h2>
-            <button onClick={mintToken}>Create Mint</button>
+            <button onClick={createMint} disabled={mintAddress !== PublicKey.default}>Create Mint</button>
             <br/>
             <h2>Token Mint:</h2>
-            <p>{mintAddress}</p>
+            {mintAddress !== PublicKey.default && <p>{mintAddress.toString()}</p>}
             <h2>Token Account Owner:</h2>
-            <p>input todo</p>
-            <button>Create Token Account</button>
+            {tokenAccountAddress !== PublicKey.default && <p>{tokenAccountAddress.toString()}</p>}
+            <button onClick={createTokenAccount} disabled={tokenAccountAddress !== PublicKey.default}>Create Token Account</button>
             <br/>
-            <h2>Token Mint:</h2>
-            <p>input todo</p>
             <h2>Recipient</h2>
-            <p>input todo</p>
+            <input placeholder={"Address"} onChange={handleRecepientChange}></input>
             <h2>Amount Tokens to Mint</h2>
-            <p>input todo</p>
+            <input type="number" onChange={handleAmountChange} value={amount}/>
             <button>Mint Tokens</button>
             <br/>
             <h2>Token Balance: {tokenBalance}</h2>
