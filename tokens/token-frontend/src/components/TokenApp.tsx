@@ -9,7 +9,8 @@ import {
     getMinimumBalanceForRentExemptMint,
     createInitializeMintInstruction,
     getAssociatedTokenAddress,
-    createAssociatedTokenAccountInstruction
+    createAssociatedTokenAccountInstruction,
+    createMintToInstruction,
 } from '@solana/spl-token';
 
 
@@ -77,7 +78,6 @@ const TokenApp = () => {
         setMintAddress(mint.publicKey);
     };
 
-    const transaction = new Transaction();
 
     const createTokenAccount = async (event: any) => {
         event.preventDefault();
@@ -98,6 +98,8 @@ const TokenApp = () => {
             publicKey,
             mintAddress,
         );
+
+        const transaction = new Transaction();
 
         transaction.add(createTokenAccount);
 
@@ -123,11 +125,39 @@ const TokenApp = () => {
         setAmount(event.target.value);
     }
 
-    const MintToken = async (event: any) => {
+    const mintToken = async (event: any) => {
         event.preventDefault();
         if (!connection || !publicKey) {
             return;
         }
+        if (amount <= 0) {
+            txLogs.concat([
+                `Amount must be greater than 0, ${amount} selected`
+            ]);
+        }
+
+        const transaction = new Transaction();
+
+        transaction.add(
+            createMintToInstruction(
+                mintAddress,
+                tokenAccountAddress,
+                publicKey,
+                amount,
+            )
+        )
+
+        const sig = await sendTransaction(transaction, connection);
+        setTxLogs(
+            txLogs.concat([
+                `Minted ${amount} tokens to ${recepientAddress}`,
+                `Mint Signature: ${sig}`,
+            ]))
+        if (sig) {
+            const token_balance = await connection.getTokenAccountBalance(tokenAccountAddress);
+            setTokenBalance(Number(token_balance.value.amount));
+        }
+
 
 
     }
@@ -153,7 +183,7 @@ const TokenApp = () => {
             <input placeholder={"Address"} onChange={handleRecepientChange}></input>
             <h2>Amount Tokens to Mint</h2>
             <input type="number" onChange={handleAmountChange} value={amount}/>
-            <button>Mint Tokens</button>
+            <button onClick={mintToken}>Mint Tokens</button>
             <br/>
             <h2>Token Balance: {tokenBalance}</h2>
         </div>
